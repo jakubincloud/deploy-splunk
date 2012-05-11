@@ -30,3 +30,6 @@ pip-log.txt
 .idea/*
 *.iml
 
+# ignore valid cmdb credentials
+credentials/.valid_cmdb
+
