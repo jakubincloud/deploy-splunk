@@ -53,6 +53,9 @@ class DeploySplunkTest(unittest.TestCase):
         self.assertEquals(expectedString, output)
 
     def testConstructorValidFileConfig(self):
+        """
+        valid config with credentials not published in git
+        """
         ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
         self.assertTrue(ds.is_connected)
 
