@@ -4,6 +4,7 @@ import socket
 import sys
 import httplib2
 import json
+import urllib
 from time import sleep
 
 __author__ = 'richard'
@@ -250,6 +251,25 @@ class CirrusCmdb(object):
         else:
             return None
 
+    def get_customer_details(self, customer_name):
+        params_url = urllib.urlencode({'q[name_equals]':customer_name})
+        query_url = self._base_api_url + '/customers.json?%s' % params_url
+        content = self.__run_query(query_url)
+
+        if content is not None and len(content) > 0:
+            return content[0]
+        else:
+            self._logger.critical('customer details not found: %s' % customer_name)
+            return None
+
+    def get_all_aws_account_numbers(self, customer_name):
+        content = []
+        customer = self.get_customer_details(customer_name)
+        if customer is not None:
+            query_url = self._base_api_url + '/aws_accounts.json?q[customer_id_equals]=%s' % customer['id']
+
+            content = self.__run_query(query_url)
+        return content
 
     def can_connect(self):
         try:

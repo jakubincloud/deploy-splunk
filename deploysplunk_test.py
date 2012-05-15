@@ -1,6 +1,8 @@
 from StringIO import StringIO
 import unittest
+import ConfigParser
 from deploysplunk import DeploySplunk
+import logging
 
 __author__ = 'jakub.zygmunt'
 
@@ -11,8 +13,15 @@ class DeploySplunkTest(unittest.TestCase):
         """
         self.out = StringIO()
 
+        logging.basicConfig()
+
     def getOutput(self):
         return self.out.getvalue().strip()
+
+    def loadConfigFile(self, file):
+        parser=ConfigParser.SafeConfigParser()
+        parser.read(file)
+        return parser
 
     def testRedirectOutput(self):
         expectedString = 'This is a logging test'
@@ -58,5 +67,19 @@ class DeploySplunkTest(unittest.TestCase):
         """
         ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
         self.assertTrue(ds.is_connected)
+
+    def testGetAwsAccountsInvalidClient(self):
+        expectedList = []
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        client = "Invalid Client"
+        accounts = ds.getAmazonAccounts(client)
+        self.assertEqual(expectedList, accounts)
+
+    def testGetAwsAccountsValidClient(self):
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        parser = self.loadConfigFile('credentials/.confidential_data')
+        client = parser.get('testclient', 'client')
+        accounts = ds.getAmazonAccounts(client)
+        self.assertTrue(len(accounts) > 0)
 
 

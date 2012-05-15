@@ -40,6 +40,13 @@ class DeploySplunk(object):
         else:
             self.log('Invalid config file {0}'.format(file))
 
+    def getAmazonAccounts(self, client=None):
+        aws_accounts = []
+        if self.is_connected:
+            # get customer id
+            aws_accounts = self.cmdb.get_all_aws_account_numbers(client)
+        return aws_accounts
+
     def deploy(self, clientName):
         if self.config:
             if self.is_connected:
