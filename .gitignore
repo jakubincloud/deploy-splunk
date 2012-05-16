@@ -33,4 +33,5 @@ pip-log.txt
 # ignore valid cmdb credentials
 credentials/.valid_cmdb
 credentials/.confidential_data
+output/
 

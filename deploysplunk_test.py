@@ -1,6 +1,9 @@
 from StringIO import StringIO
+import os
+import shutil
 import unittest
 import ConfigParser
+import fnmatch
 from deploysplunk import DeploySplunk
 import logging
 
@@ -13,7 +16,12 @@ class DeploySplunkTest(unittest.TestCase):
         """
         self.out = StringIO()
 
+
         logging.basicConfig()
+    def tearDown(self):
+        shutil.rmtree('output')
+        os.makedirs('output')
+        self.cleanConfFiles()
 
     def getOutput(self):
         return self.out.getvalue().strip()
@@ -23,23 +31,38 @@ class DeploySplunkTest(unittest.TestCase):
         parser.read(file)
         return parser
 
-    def testRedirectOutput(self):
+    def cleanConfFiles(self):
+        matches = []
+        for root, dirnames, filenames in os.walk('test_templates'):
+            for filename in fnmatch.filter(filenames, '*.conf'):
+                matches.append(os.path.join(root, filename))
+        for file in matches:
+            os.remove(file)
+
+    def testShouldReturnValidClientAppName(self):
+        client_name = 'New StrIng-client appName'
+        expectedString = 'newstring-clientappname'
+        ds = DeploySplunk(out=self.out)
+        outputString = ds.getClientAppName(client_name)
+        self.assertEquals(expectedString, outputString)
+
+    def testShouldRedirectOutput(self):
         expectedString = 'This is a logging test'
         ds = DeploySplunk(out=self.out)
         ds.testOutput(expectedString)
         output = self.getOutput()
         self.assertEquals(expectedString, output)
 
-    def testEmptyConstructor(self):
+    def testEmptyConstructorShouldReturnMessage(self):
         expectedString = 'No config found'
         ds = DeploySplunk(out=self.out)
         ds.deploy('client')
         output = self.getOutput()
         self.assertEquals(expectedString, output)
 
-    def testConstructorInvalidConfig(self):
+    def testShouldReturnMessageOnConstructorWithInvalidConfig(self):
         expectedString = 'Cannot connect to CMDB'
-        config = {  'base_url': 'http://127.0.0.1',
+        config = {  'base_url': 'http://completelywrong.dns.name.to.be.sure.it.wont.work',
                     'user': 'a',
                     'password': 'b',
         }
@@ -81,5 +104,84 @@ class DeploySplunkTest(unittest.TestCase):
         client = parser.get('testclient', 'client')
         accounts = ds.getAmazonAccounts(client)
         self.assertTrue(len(accounts) > 0)
+
+    def testShouldOutputMessageAppDirectoryNotFound(self):
+        expectedString = 'App directory not found'
+        config = {x[0]:x[1] for x in self.loadConfigFile('credentials/.valid_cmdb').items('cmdb') }
+        ds = DeploySplunk(config=config, out=self.out)
+        client_name = 'wigywigy'
+        ds.cloneAppFromGithub('totally_invalid_folder', client_name)
+        output = self.getOutput()
+        self.assertEquals(expectedString, output)
+
+    def testShouldOutputMessageOnEmptyGithubUrl(self):
+        expectedString = 'No Github URL defined'
+        config = {x[0]:x[1] for x in self.loadConfigFile('credentials/.valid_cmdb').items('cmdb') }
+        config['github_url']=''
+        ds = DeploySplunk(config=config, out=self.out)
+        parser = self.loadConfigFile('credentials/.confidential_data')
+        app_folder = parser.get('app', 'app_home')
+        client_name = 'wigywigy'
+        ds.cloneAppFromGithub(app_folder, client_name)
+        output = self.getOutput()
+        self.assertEquals(expectedString, output)
+
+    def testShouldOutputMessageOnWrongGithubRepoUrl(self):
+        expectedString = "Cannot clone the repository"
+        config = {x[0]:x[1] for x in self.loadConfigFile('credentials/.valid_cmdb').items('cmdb') }
+        config['github_url'] = 'http://there.is.no.repo.under.this.url/'
+        ds = DeploySplunk(config=config, out=self.out)
+        parser = self.loadConfigFile('credentials/.confidential_data')
+        app_home = parser.get('app', 'app_home')
+        client_name = 'wigywigy'
+        ds.cloneAppFromGithub(app_home, client_name)
+        output = self.getOutput()
+        self.assertEquals(expectedString, output)
+
+    def testShouldReportEmptyMessageOnValidGithubUrl(self):
+        expectedString = ''
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        parser = self.loadConfigFile('credentials/.confidential_data')
+        app_home = parser.get('app', 'app_home')
+        client_name = 'wigywigy'
+        ds.cloneAppFromGithub(app_home, client_name)
+        output = self.getOutput()
+        self.assertEquals(expectedString, output)
+
+
+
+    def testFileTemplateclientShouldReturnFile(self):
+        templateFile = 'test_templates/local/savedsearches.conf.template'
+        expectedFile = 'test_templates/local/savedsearches.conf'
+        data = { 'client' : 'wigywigy' }
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        ds.parseTemplate(templateFile, data )
+        self.assertTrue(os.path.exists(expectedFile))
+
+
+    def testFileTemplateClientShouldReturnModifiedText(self):
+        expectedString =  '''[instanceReservationExpiryRecommendation]
+alert.suppress = 0
+alert.track = 1
+cron_schedule = 0 0 * * *
+search = index="wigywigy" test test | other text index-wigywigy'''
+        templateFile = 'test_templates/local/savedsearches.conf.template'
+        expectedFile = 'test_templates/local/savedsearches.conf'
+        data = { 'client' : 'wigywigy' }
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        ds.parseTemplate(templateFile, data )
+        fr=open(expectedFile,'r')
+        outputString = fr.read()
+        self.assertEqual(expectedString, outputString)
+
+
+
+
+
+
+
+
+
+
 
 

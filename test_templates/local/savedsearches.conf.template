@@ -1,0 +1,5 @@
+[instanceReservationExpiryRecommendation]
+alert.suppress = 0
+alert.track = 1
+cron_schedule = 0 0 * * *
+search = index="{{ client }}" test test | other text index-{{ client }}
