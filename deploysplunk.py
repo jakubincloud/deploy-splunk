@@ -3,6 +3,7 @@ import os
 import sys
 import ConfigParser
 import re
+import fnmatch
 from cirrus_cmdb import CirrusCmdb
 from jinja2 import Template
 
@@ -99,6 +100,25 @@ class DeploySplunk(object):
         with open(newfilename, 'w') as fw:
             fw.write(template)
 
+    def getTemplateFiles(self, folder):
+        matches = []
+        for root, dirnames, filenames in os.walk(folder):
+            for filename in fnmatch.filter(filenames, '*.template'):
+                matches.append(os.path.join(root, filename))
+        return matches
+
+    def convertAllTemplates(self, folder, data):
+        templates = self.getTemplateFiles(folder)
+        for file in templates:
+            self.parseTemplate(file, data)
+        self.updateGitIgnore(folder, templates)
+
+
+    def updateGitIgnore(self, folder, templateFiles):
+        files = [ re.sub('\.template$', '',f) for f in templateFiles ]
+        with open('%s/.gitignore' % folder, 'a') as f:
+           for filename in files:
+               f.write('%s\n' % filename)
 
     def deploy(self, clientName):
         if self.config:

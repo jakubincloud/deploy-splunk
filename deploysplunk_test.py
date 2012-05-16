@@ -15,9 +15,9 @@ class DeploySplunkTest(unittest.TestCase):
         set up data used in the tests
         """
         self.out = StringIO()
-
-
         logging.basicConfig()
+        self.prepareGitIgnoreFile()
+
     def tearDown(self):
         shutil.rmtree('output')
         os.makedirs('output')
@@ -31,13 +31,21 @@ class DeploySplunkTest(unittest.TestCase):
         parser.read(file)
         return parser
 
-    def cleanConfFiles(self):
+    def getFiles(self, folder, filter):
         matches = []
-        for root, dirnames, filenames in os.walk('test_templates'):
-            for filename in fnmatch.filter(filenames, '*.conf'):
+        for root, dirnames, filenames in os.walk(folder):
+            for filename in fnmatch.filter(filenames, filter):
                 matches.append(os.path.join(root, filename))
+        return matches
+
+    def cleanConfFiles(self):
+        matches = self.getFiles(folder = 'test_files', filter='*.conf')
         for file in matches:
             os.remove(file)
+
+    def prepareGitIgnoreFile(self):
+        with open('test_files/.gitignore', 'w') as f:
+            f.write("# this line shouldn't be removed\n")
 
     def testShouldReturnValidClientAppName(self):
         client_name = 'New StrIng-client appName'
@@ -151,8 +159,8 @@ class DeploySplunkTest(unittest.TestCase):
 
 
     def testFileTemplateclientShouldReturnFile(self):
-        templateFile = 'test_templates/local/savedsearches.conf.template'
-        expectedFile = 'test_templates/local/savedsearches.conf'
+        templateFile = 'test_files/local/savedsearches.conf.template'
+        expectedFile = 'test_files/local/savedsearches.conf'
         data = { 'client' : 'wigywigy' }
         ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
         ds.parseTemplate(templateFile, data )
@@ -165,8 +173,8 @@ alert.suppress = 0
 alert.track = 1
 cron_schedule = 0 0 * * *
 search = index="wigywigy" test test | other text index-wigywigy'''
-        templateFile = 'test_templates/local/savedsearches.conf.template'
-        expectedFile = 'test_templates/local/savedsearches.conf'
+        templateFile = 'test_files/local/savedsearches.conf.template'
+        expectedFile = 'test_files/local/savedsearches.conf'
         data = { 'client' : 'wigywigy' }
         ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
         ds.parseTemplate(templateFile, data )
@@ -188,8 +196,8 @@ index = wigywigy
 interval = 0 * * * *
 source = some_source
 sourcetype = some_sourcetype'''
-        templateFile = 'test_templates/local/inputs.conf.template'
-        expectedFile = 'test_templates/local/inputs.conf'
+        templateFile = 'test_files/local/inputs.conf.template'
+        expectedFile = 'test_files/local/inputs.conf'
         data = { 'client' : 'wigywigy',
                 'aws_accounts' : [ { 'number': '1111-2222-3333'} , { 'number': '2222-3333-4444'} ]
                }
@@ -201,9 +209,60 @@ sourcetype = some_sourcetype'''
         outputString = fr.read().strip()
         self.assertEqual(expectedString, outputString)
 
+    def testShouldReturnListOfTemplates(self):
+        expectedList = [ 'test_files/local/inputs.conf.template',
+                         'test_files/local/savedsearches.conf.template',
+                         'test_files/metadata/local.meta.template']
+        app_folder = 'test_files'
+
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        outputList = ds.getTemplateFiles(app_folder)
+        self.assertEquals(expectedList, outputList)
+
+    def testShouldConvertAllTemplates(self):
+        expectedList = [ 'test_files/local/inputs.conf',
+                         'test_files/local/savedsearches.conf',
+                         'test_files/metadata/local.meta' ]
+        data = { 'client' : 'wigywigy',
+                 'aws_accounts' : [ { 'number': '1111-2222-3333'} , { 'number': '2222-3333-4444'} ]
+        }
+        app_folder = 'test_files'
+
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        ds.convertAllTemplates(app_folder, data)
+        convertedFiles = self.getFiles(folder=app_folder, filter='*.*')
+        for file in expectedList:
+            self.assertTrue(file in convertedFiles, msg='Checking if file %s exists' % file)
 
 
+    def testShouldAppendToGitIgnore(self):
+        expectedString = "# this line shouldn't be removed\n"
+        data = { 'client' : 'wigywigy',
+                 'aws_accounts' : [ { 'number': '1111-2222-3333'} , { 'number': '2222-3333-4444'} ]
+        }
+        app_folder = 'test_files'
 
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        ds.convertAllTemplates(app_folder, data)
+        f = open('test_files/.gitignore')
+        lines = [x for x in f.readlines()]
+        self.assertTrue(expectedString in lines)
+
+    def testShouldAppendToGitIgnoreListOfConvertedTemplates(self):
+        expectedList = [ 'test_files/local/inputs.conf\n',
+                         'test_files/local/savedsearches.conf\n',
+                         'test_files/metadata/local.meta\n' ]
+        data = { 'client' : 'wigywigy',
+                 'aws_accounts' : [ { 'number': '1111-2222-3333'} , { 'number': '2222-3333-4444'} ]
+        }
+        app_folder = 'test_files'
+
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        ds.convertAllTemplates(app_folder, data)
+        f = open('test_files/.gitignore')
+        lines = [x for x in f.readlines()]
+        for file in expectedList:
+            self.assertTrue(file in lines, msg='Checking if file %s is in .gitignore' % file)
 
 
 
