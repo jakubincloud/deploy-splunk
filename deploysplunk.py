@@ -95,7 +95,6 @@ class DeploySplunk(object):
         fr=open(filename,'r')
         inputSource = fr.read()
         template = Template(inputSource).render(data)
-        print "template", template
         newfilename = re.sub('\.template$', '', filename)
         with open(newfilename, 'w') as fw:
             fw.write(template)

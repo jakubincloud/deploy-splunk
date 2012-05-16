@@ -1,0 +1,8 @@
+{% for row in aws_accounts %}
+[script://script {{ row.number }} arg]
+disabled = false
+index = {{ client }}
+interval = 0 * * * *
+source = some_source
+sourcetype = some_sourcetype
+{% endfor %}

@@ -174,6 +174,33 @@ search = index="wigywigy" test test | other text index-wigywigy'''
         outputString = fr.read()
         self.assertEqual(expectedString, outputString)
 
+    def testFileTemplateMultipleAccountsShouldReturnModifiedFile(self):
+        expectedString =  '''[script://script 1111-2222-3333 arg]
+disabled = false
+index = wigywigy
+interval = 0 * * * *
+source = some_source
+sourcetype = some_sourcetype
+
+[script://script 2222-3333-4444 arg]
+disabled = false
+index = wigywigy
+interval = 0 * * * *
+source = some_source
+sourcetype = some_sourcetype'''
+        templateFile = 'test_templates/local/inputs.conf.template'
+        expectedFile = 'test_templates/local/inputs.conf'
+        data = { 'client' : 'wigywigy',
+                'aws_accounts' : [ { 'number': '1111-2222-3333'} , { 'number': '2222-3333-4444'} ]
+               }
+
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+
+        ds.parseTemplate(templateFile, data )
+        fr=open(expectedFile,'r')
+        outputString = fr.read().strip()
+        self.assertEqual(expectedString, outputString)
+
 
 
 
