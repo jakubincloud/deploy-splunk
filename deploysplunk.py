@@ -19,8 +19,12 @@ class Struct:
 
 
 class DeploySplunk(object):
-    def __init__(self, config=None, file=None, out=sys.stdout):
+    splunk_bin = '/opt/splunk/bin/splunk'
+
+    def __init__(self, config=None, file=None, out=sys.stdout, user=None, password=None):
         self.out = out
+        self.user = user
+        self.password = password
 
         self.config = Struct(**config) if isinstance(config, dict) else config
         if file:
@@ -46,6 +50,7 @@ class DeploySplunk(object):
         """
         returns generator of output lines given by cmd
         """
+
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while(True):
             retcode = p.poll()
@@ -54,11 +59,12 @@ class DeploySplunk(object):
             if(retcode is not None):
                 break
 
-    def __runCommand(self, cmd):
+    def __runCommand(self, cmd, return_list=False):
         """
         runs command and returns output as string
         """
-        output = '\n'.join(x for x in self.__run(cmd))
+        outputList = [x for x in self.__run(cmd)]
+        output = outputList if return_list else ''.join(outputList)
         return output
 
     def readConfigFile(self, file):
@@ -119,6 +125,32 @@ class DeploySplunk(object):
         with open('%s/.gitignore' % folder, 'a') as f:
            for filename in files:
                f.write('%s\n' % filename)
+
+    def isUserRoleAlreadyDefined(self, conf_file, role):
+        parser=ConfigParser.SafeConfigParser()
+        parser.read(conf_file)
+        return role in parser.sections()
+
+
+    def addUserRole(self, conf_file, data):
+        user_role = 'role_client-%s' % data['client']
+        if not self.isUserRoleAlreadyDefined(conf_file, user_role):
+            fr=open('templates/userrole.template','r')
+            inputSource = fr.read()
+            user_role_template = Template(inputSource).render(data)
+            with open(conf_file, 'a') as fw :
+                fw.write(user_role_template)
+
+    def addUser(self, data):
+        if self.user and self.password:
+            failedString = 'Unauthorized\n'
+            output = self.__runCommand([self.splunk_bin, 'list', 'user', '-auth', '%s:%s' % (self.user, self.password) ],
+                return_list=True)
+            if failedString in output:
+                self.log("wrong username or password.")
+        else:
+            self.log("no authentication credentials found.")
+
 
     def deploy(self, clientName):
         if self.config:

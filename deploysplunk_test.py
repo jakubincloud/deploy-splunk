@@ -4,6 +4,7 @@ import shutil
 import unittest
 import ConfigParser
 import fnmatch
+import re
 from deploysplunk import DeploySplunk
 import logging
 
@@ -17,6 +18,7 @@ class DeploySplunkTest(unittest.TestCase):
         self.out = StringIO()
         logging.basicConfig()
         self.prepareGitIgnoreFile()
+        self.prepareAuthorizeConfFiles()
 
     def tearDown(self):
         shutil.rmtree('output')
@@ -46,6 +48,12 @@ class DeploySplunkTest(unittest.TestCase):
     def prepareGitIgnoreFile(self):
         with open('test_files/.gitignore', 'w') as f:
             f.write("# this line shouldn't be removed\n")
+
+    def prepareAuthorizeConfFiles(self):
+        files = ['test_files/authorize.no-role.generator', 'test_files/authorize.with-role.generator']
+        for file in files:
+            newfile = re.sub('\.generator$', '.conf', file)
+            shutil.copyfile(file, newfile)
 
     def testShouldReturnValidClientAppName(self):
         client_name = 'New StrIng-client appName'
@@ -264,8 +272,54 @@ sourcetype = some_sourcetype'''
         for file in expectedList:
             self.assertTrue(file in lines, msg='Checking if file %s is in .gitignore' % file)
 
+    def testShouldAddUserRoletoFile(self):
+        expectedKeyValuePairs = { 'rtSrchJobsQuota' : '20',
+                                  'srchIndexesAllowed' : 'client-wigywigy client-wigywigy-si',
+                                  'srchIndexesDefault' : 'client-wigywigy'
+        }
+        data = { 'client' : 'wigywigy' }
+        app_folder = 'test_files'
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        conf_file = '%s/authorize.no-role.conf' % app_folder
+        ds.addUserRole(conf_file, data)
+        parser = self.loadConfigFile(conf_file)
+        sections = parser.sections()
+        self.assertTrue('role_client-wigywigy' in sections)
+        for k in expectedKeyValuePairs.keys():
+            expectedValue = expectedKeyValuePairs[k]
+            outputValue = parser.get('role_client-wigywigy', k)
+            self.assertEqual(expectedValue, outputValue, msg='Checking parameter %s (exp:"%s", out:"%s")' % (k, expectedValue, outputValue))
 
 
+    def testShouldntAddUserRoletoFile(self):
+        notExpectedItem = 'srchindexesallowed'
+        data = { 'client' : 'wigywigy' }
+        app_folder = 'test_files'
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        conf_file = '%s/authorize.with-role.conf' % app_folder
+        ds.addUserRole(conf_file, data)
+        parser = self.loadConfigFile(conf_file)
+        sections = parser.sections()
+        parameters = [ x[0] for x in parser.items('role_client-wigywigy') ]
+        self.assertFalse( notExpectedItem in parameters)
+
+    def testShouldOutputErrorNoauthentication(self):
+        expectedString = 'no authentication credentials found.'
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out)
+        data = { 'client' : 'wigywigy' }
+        ds.splunk_bin = 'test_files/test_splunk.sh'
+        ds.addUser(data)
+        output = self.getOutput()
+        self.assertEqual(expectedString, output)
+
+    def testShouldOutputErrorWrongPassword(self):
+        expectedString = 'wrong username or password.'
+        ds = DeploySplunk(file='credentials/.valid_cmdb', out=self.out, user='user', password='nopassword')
+        data = { 'client' : 'wigywigy' }
+        ds.splunk_bin = 'test_files/test_splunk.sh'
+        ds.addUser(data)
+        output = self.getOutput()
+        self.assertEqual(expectedString, output)
 
 
 

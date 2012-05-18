@@ -1,0 +1,14 @@
+[role_client-{{ client }}]
+change_own_password = enabled
+get_metadata = enabled
+rest_apps_view = enabled
+rest_properties_get = enabled
+rtSrchJobsQuota = 20
+search = enabled
+srchDiskQuota = 500
+srchFilter = *
+srchIndexesAllowed = client-{{ client }} client-{{ client }}-si
+srchIndexesDefault = client-{{ client }}
+srchJobsQuota = 20
+srchMaxTime = 0
+srchTimeWin = 0

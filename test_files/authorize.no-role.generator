@@ -1,0 +1,4 @@
+[role_can_delete]
+delete_by_keyword = disabled
+importRoles = admin;power
+srchMaxTime = 8640000
